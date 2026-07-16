@@ -38,31 +38,31 @@ function PayloadToggle({
     <label
       title={PAYLOAD_INFO[payloadId] ?? ""}
       className={cn(
-        "flex cursor-pointer items-center justify-between gap-3 rounded-sm border border-transparent px-2 py-2 transition-colors",
+        "flex cursor-pointer items-center justify-between gap-4 rounded-sm border border-transparent px-3 py-2.5 transition-colors",
         checked ? "border-border bg-panel-raised" : "hover:bg-panel-raised/50",
       )}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span
             className={cn(
-              "font-mono text-xs",
+              "font-mono text-base",
               checked ? LANE_TEXT[lane] : "text-text",
             )}
           >
             {payloadId}
           </span>
           {meta.warnGlyph && (
-            <span className="font-mono text-xs text-warn" aria-hidden>
+            <span className="font-mono text-base text-warn" aria-hidden>
               !
             </span>
           )}
         </div>
-        <p className="mt-0.5 line-clamp-1 text-xs text-text-dim">
+        <p className="mt-1 line-clamp-1 text-sm text-text-dim">
           {PAYLOAD_INFO[payloadId] ?? "no description available"}
         </p>
       </div>
-      <Switch checked={checked} onCheckedChange={onToggle} size="sm" />
+      <Switch checked={checked} onCheckedChange={onToggle} />
     </label>
   );
 }
@@ -91,18 +91,17 @@ function CategoryCard({
         LANE_BORDER[meta.color],
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 px-3 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text">{category.name}</span>
-          <Badge variant="outline" className="rounded-sm font-mono text-[10px] text-text-dim">
+          <span className="text-base font-semibold text-text">{category.name}</span>
+          <Badge variant="outline" className="rounded-sm font-mono text-sm text-text-dim">
             {armedCount}/{keys.length}
           </Badge>
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 font-mono text-[10px] text-text-faint">
+          <label className="flex items-center gap-2 font-mono text-sm text-text-faint">
             arm all
             <Switch
-              size="sm"
               checked={allArmed}
               onCheckedChange={(on) => onSetAll(keys, Boolean(on))}
             />

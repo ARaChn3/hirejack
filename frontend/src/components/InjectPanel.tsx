@@ -70,7 +70,7 @@ export function InjectPanel({
     <div className="flex flex-col gap-4">
       <div className="rounded-sm border border-border bg-panel px-3 py-3">
         {armedKeys.length === 0 ? (
-          <p className="font-mono text-xs text-text-faint">no payloads armed</p>
+          <p className="font-mono text-sm text-text-faint">no payloads armed</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {armedKeys.map((key) => {
@@ -80,7 +80,7 @@ export function InjectPanel({
                 <span
                   key={key}
                   className={cn(
-                    "flex items-center gap-1 rounded-sm border bg-panel-raised px-1.5 py-0.5 font-mono text-[11px]",
+                    "flex items-center gap-1.5 rounded-sm border bg-panel-raised px-2 py-1 font-mono text-sm",
                     LANE_TEXT[lane.color],
                   )}
                 >
@@ -92,7 +92,7 @@ export function InjectPanel({
                     disabled={status === "injecting"}
                     className="text-text-faint hover:text-text"
                   >
-                    <X className="size-2.5" />
+                    <X className="size-3" />
                   </button>
                 </span>
               );
@@ -100,7 +100,7 @@ export function InjectPanel({
           </div>
         )}
         {armedKeys.length > 0 && (
-          <p className="mt-2 font-mono text-[11px] text-text-dim">
+          <p className="mt-2 font-mono text-sm text-text-dim">
             {armedKeys.length} payload{armedKeys.length === 1 ? "" : "s"} armed · est. artifact +
             {formatBytes(estBytes)}
           </p>
@@ -119,7 +119,7 @@ export function InjectPanel({
               ? "retry ▸"
               : "inject ▸"}
         </Button>
-        {reason && <span className="font-mono text-xs text-text-faint">{reason}</span>}
+        {reason && <span className="font-mono text-sm text-text-faint">{reason}</span>}
       </div>
 
       {(status === "injecting" || logs.length > 0) && (
@@ -131,7 +131,7 @@ export function InjectPanel({
           )}
         >
           <ScrollArea className="h-32">
-            <div ref={scrollRef} className="flex flex-col gap-0.5 pr-2 font-mono text-xs">
+            <div ref={scrollRef} className="flex flex-col gap-1 pr-2 font-mono text-sm">
               {logs.map((line, i) => (
                 <div key={i} className="text-text-dim">
                   <span className="text-text-faint">$ </span>

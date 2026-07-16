@@ -44,9 +44,9 @@ export function Stage({
       </div>
 
       <div className="min-w-0 flex-1 pb-14">
-        <div className="mb-4 flex items-baseline gap-3">
-          <span className="font-mono text-xs text-text-faint">[{index}]</span>
-          <h2 className="text-sm font-medium tracking-[0.2em] text-text-dim uppercase">
+        <div className="mb-5 flex items-baseline gap-3">
+          <span className="font-mono text-base text-text-faint">[{index}]</span>
+          <h2 className="text-lg font-semibold tracking-[0.12em] text-text uppercase">
             {title}
           </h2>
         </div>

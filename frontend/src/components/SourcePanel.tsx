@@ -42,8 +42,8 @@ export function SourcePanel({
       <div className="rounded-sm border border-border-active bg-panel-raised px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="truncate font-mono text-sm text-text">{file.file.name}</div>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-text-dim">
+            <div className="truncate font-mono text-base text-text">{file.file.name}</div>
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm text-text-dim">
               <span>{formatBytes(file.size)}</span>
               {file.pages !== null && <span>{file.pages} page{file.pages === 1 ? "" : "s"}</span>}
               <span className="text-text-faint">sha256:{file.hash.slice(0, 16)}…</span>
@@ -91,7 +91,7 @@ export function SourcePanel({
             <div className="h-full w-1/3 animate-[scan_1.2s_ease-in-out_infinite] bg-accent" />
           </div>
         )}
-        <div className={cn("font-mono text-xs", dragOver ? "text-accent" : "text-text-dim")}>
+        <div className={cn("font-mono text-sm", dragOver ? "text-accent" : "text-text-dim")}>
           {dragOver
             ? "release to load"
             : error

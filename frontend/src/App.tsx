@@ -140,8 +140,8 @@ function App() {
 
       {stage02Unlocked && state.status !== "done" && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
-          <div className="mx-auto flex h-14 max-w-[880px] items-center justify-between px-4">
-            <span className="font-mono text-xs text-text-dim">
+          <div className="mx-auto flex h-16 max-w-[880px] items-center justify-between px-4">
+            <span className="font-mono text-sm text-text-dim">
               {state.selected.size} payload{state.selected.size === 1 ? "" : "s"} armed
             </span>
             <Button

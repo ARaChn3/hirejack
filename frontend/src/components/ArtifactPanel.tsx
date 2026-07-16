@@ -25,7 +25,7 @@ export function ArtifactPanel({
   }, [artifact]);
 
   if (!artifact || !file) {
-    return <p className="font-mono text-xs text-text-faint">awaiting artifact…</p>;
+    return <p className="font-mono text-sm text-text-faint">awaiting artifact…</p>;
   }
 
   const delta = artifact.size - file.size;
@@ -43,7 +43,7 @@ export function ArtifactPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-sm border border-border bg-panel px-3 py-3">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-xs sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 font-mono text-sm sm:grid-cols-4">
           <div>
             <dt className="text-text-faint">original</dt>
             <dd className="text-text">{formatBytes(file.size)}</dd>
@@ -75,14 +75,14 @@ export function ArtifactPanel({
         <Button
           variant="outline"
           onClick={onRunAgain}
-          className="rounded-sm font-mono text-xs"
+          className="rounded-sm font-mono text-sm"
         >
           run again
         </Button>
         <Button
           variant="ghost"
           onClick={onNewSource}
-          className="rounded-sm font-mono text-xs text-text-dim"
+          className="rounded-sm font-mono text-sm text-text-dim"
         >
           new source
         </Button>
