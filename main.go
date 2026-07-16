@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/pkg/browser"
 )
 
 //go:embed frontend/dist/*
@@ -18,10 +20,12 @@ var frontend embed.FS
 
 func main() {
 	port := flag.String("port", "8080", "server port")
+	headless := flag.Bool("headless", false, "don't open browser")
 	flag.Parse()
 
 	app := fiber.New(fiber.Config{
-		AppName: "hirejack",
+		AppName:               "hirejack",
+		DisableStartupMessage: true,
 	})
 
 	app.Use(logger.New())
@@ -38,13 +42,19 @@ func main() {
 		log.Fatal(err)
 	}
 	app.Use("/", filesystem.New(filesystem.Config{
-		Root:       http.FS(dist),
-		Browse:     false,
-		Index:      "index.html",
-		NotFoundFile: "index.html", // SPA fallback
+		Root:         http.FS(dist),
+		Browse:       false,
+		Index:        "index.html",
+		NotFoundFile: "index.html",
 	}))
 
-	log.Printf("hirejack running on http://localhost:%s", *port)
+	url := fmt.Sprintf("http://localhost:%s", *port)
+	log.Printf("hirejack running on %s", url)
+
+	if !*headless {
+		go browser.OpenURL(url)
+	}
+
 	log.Fatal(app.Listen(":" + *port))
 }
 

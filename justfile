@@ -32,9 +32,13 @@ clean:
     rm -f hirejack
     rm -rf frontend/dist frontend/node_modules
 
-# Run the server
+# Run the server (opens browser)
 run: build
     ./hirejack
+
+# Run headless (no browser)
+run-headless: build
+    ./hirejack -headless
 
 # Run with custom port
 run-port port="8080":
