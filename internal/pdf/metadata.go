@@ -52,6 +52,19 @@ func (p *PDF) GetInfoDict() (*InfoDict, error) {
 	info.Creator = stringFromDict(d, "Creator")
 	info.Producer = stringFromDict(d, "Producer")
 
+	standardKeys := map[string]bool{
+		"Author": true, "Title": true, "Subject": true,
+		"Keywords": true, "Creator": true, "Producer": true,
+		"CreationDate": true, "ModDate": true, "Trapped": true,
+	}
+	for k := range d {
+		if !standardKeys[k] {
+			if v := stringFromDict(d, k); v != "" {
+				info.Custom[k] = v
+			}
+		}
+	}
+
 	return info, nil
 }
 
