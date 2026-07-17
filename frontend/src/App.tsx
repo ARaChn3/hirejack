@@ -38,7 +38,7 @@ async function runInject(
 ) {
   dispatch({ type: "START_INJECT" });
 
-  const payloadIds = [...selected].map((k) => k.split(":")[1]);
+  const payloadIds = [...selected].map((k) => k.replace(":", "."));
 
   dispatch({ type: "LOG", line: "target loaded ✓" });
   await delay(200);
