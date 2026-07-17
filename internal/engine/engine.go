@@ -93,12 +93,15 @@ type InjectionPoint struct {
 
 // Inject applies payloads to a PDF.
 func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
+	// Reset orphan buffer from any previous run
+	pdf.ResetOrphanBuffer()
+
 	log.Debug().
-		Int("pdf_size", len(req.PDF)).
-		Int("payload_ids", len(req.PayloadIDs)).
+		Int("pdf_kb", len(req.PDF)/1024).
+		Int("payloads", len(req.PayloadIDs)).
 		Str("profile", req.ProfileID).
 		Int("stealth", int(req.Stealth)).
-		Bool("canary", req.AddCanary).
+		Bool("fast", req.Fast).
 		Msg("engine: inject start")
 
 	doc, err := pdf.Parse(req.PDF)
@@ -106,13 +109,11 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 		log.Debug().Err(err).Msg("engine: pdf parse failed")
 		return nil, fmt.Errorf("engine: parse: %w", err)
 	}
-	log.Debug().Msg("engine: pdf parsed")
 
 	stealth := req.Stealth
 	if stealth == 0 {
 		stealth = e.stealth
 	}
-	log.Debug().Int("stealth", int(stealth)).Msg("engine: using stealth level")
 
 	result := &InjectResult{
 		Injections: []InjectionPoint{},
@@ -123,21 +124,22 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 	log.Debug().Int("resolved", len(payloadList)).Msg("engine: payloads resolved")
 
 	// Inject based on stealth level
+	stealthName := map[StealthLevel]string{
+		StealthBasic: "L1-basic", StealthHex: "L2-hex", StealthSplit: "L3-split",
+		StealthOrphan: "L4-orphan", StealthMax: "L5-max",
+	}[stealth]
+	log.Debug().Str("mode", stealthName).Bool("fast", req.Fast).Msg("engine: injecting")
+
 	switch {
 	case stealth >= StealthMax:
-		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectMax (L5)")
 		e.injectMax(doc, payloadList, result, req.Fast)
 	case stealth >= StealthOrphan:
-		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectOrphan (L4)")
 		e.injectOrphan(doc, payloadList, result, req.Fast)
 	case stealth >= StealthSplit:
-		log.Debug().Msg("engine: using injectSplit (L3)")
 		e.injectSplit(doc, payloadList, result)
 	case stealth >= StealthHex:
-		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectHex (L2)")
 		e.injectHex(doc, payloadList, result, req.Fast)
 	default:
-		log.Debug().Msg("engine: using injectBasic (L1)")
 		e.injectBasic(doc, payloadList, result)
 	}
 
@@ -173,10 +175,11 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 		}
 	}
 
-	// Use incremental write for orphan modes to preserve unreferenced objects
+	// Use orphan-preserving write for L4/L5
 	if stealth >= StealthOrphan {
-		result.PDF, err = doc.BytesIncremental()
-		log.Debug().Msg("engine: using incremental write for orphan preservation")
+		orphanCount := pdf.GetOrphanCount()
+		result.PDF, err = doc.BytesWithOrphans()
+		log.Debug().Int("orphans", orphanCount).Msg("engine: appended orphan streams")
 	} else {
 		result.PDF, err = doc.Bytes()
 	}
@@ -225,7 +228,6 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 
 	if req.ProfileID != "" {
 		if profile := payloads.GetProfile(req.ProfileID); profile != nil {
-			log.Debug().Str("profile", req.ProfileID).Int("count", len(profile)).Msg("engine: using profile")
 			for _, id := range profile {
 				if p := payloads.GetPayload(id); p != nil {
 					list = append(list, *p)
@@ -233,6 +235,7 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 					notFound = append(notFound, id)
 				}
 			}
+			log.Debug().Str("profile", req.ProfileID).Int("loaded", len(list)).Msg("engine: profile loaded")
 		} else {
 			log.Debug().Str("profile", req.ProfileID).Msg("engine: profile not found")
 		}
@@ -240,44 +243,55 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 
 	for _, id := range req.PayloadIDs {
 		if p := payloads.GetPayload(id); p != nil {
-			log.Debug().Str("id", id).Msg("engine: payload found")
 			list = append(list, *p)
 		} else {
-			log.Debug().Str("id", id).Msg("engine: payload NOT found")
 			notFound = append(notFound, id)
 		}
 	}
 
 	if len(notFound) > 0 {
-		log.Debug().Strs("missing", notFound).Msg("engine: some payloads not found")
+		log.Debug().Int("count", len(notFound)).Strs("ids", notFound[:min(5, len(notFound))]).Msg("engine: payloads not found")
 	}
 
 	// Fill empty templates with generated content
 	generated := 0
+	withTemplate := 0
 	for i := range list {
-		if list[i].Template == "" {
-			catID := ""
-			for _, cat := range payloads.Registry {
-				for _, p := range cat.Payloads {
-					if p.ID == list[i].ID {
-						catID = cat.ID
-						break
-					}
-				}
-			}
-			if catID != "" {
-				list[i].Template = e.payloadGen.FillTemplate(catID + "." + list[i].ID)
-				if list[i].Template != "" {
-					generated++
+		if list[i].Template != "" {
+			withTemplate++
+			continue
+		}
+		catID := ""
+		for _, cat := range payloads.Registry {
+			for _, p := range cat.Payloads {
+				if p.ID == list[i].ID {
+					catID = cat.ID
+					break
 				}
 			}
 		}
-	}
-	if generated > 0 {
-		log.Debug().Int("count", generated).Msg("engine: templates generated from SecLists")
+		if catID != "" {
+			list[i].Template = e.payloadGen.FillTemplate(catID + "." + list[i].ID)
+			if list[i].Template != "" {
+				generated++
+			}
+		}
 	}
 
+	log.Debug().
+		Int("total", len(list)).
+		Int("with_template", withTemplate).
+		Int("generated", generated).
+		Msg("engine: payloads resolved")
+
 	return list
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (e *Engine) injectBasic(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
@@ -426,16 +440,9 @@ func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *Injec
 		}
 	}
 
-	metaCount := 0
-	for _, v := range metaBuckets {
-		metaCount += len(v)
+	if skipped > 0 {
+		log.Debug().Int("skipped", skipped).Msg("engine: empty templates")
 	}
-	log.Debug().
-		Int("metadata", metaCount).
-		Int("xmp", len(xmpPayloads)).
-		Int("orphan", len(orphanPayloads)).
-		Int("skipped", skipped).
-		Msg("engine: L5 distribution")
 
 	// Inject metadata (hex encoded, concatenated)
 	for _, field := range metaFields {

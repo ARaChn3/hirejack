@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"hirejack/internal/server"
 	"github.com/pkg/browser"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"hirejack/internal/server"
 )
 
 var frontend embed.FS
@@ -34,24 +32,12 @@ var serveCmd = &cobra.Command{
 	},
 }
 
-var debug bool
-
 func init() {
 	serveCmd.Flags().StringVarP(&port, "port", "p", "8080", "server port")
 	serveCmd.Flags().BoolVar(&headless, "headless", false, "don't open browser")
-	serveCmd.Flags().BoolVar(&debug, "debug", true, "enable debug logging")
 }
 
 func runServer() {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: "15:04:05",
-	})
-
 	app := fiber.New(fiber.Config{
 		AppName:               "hirejack",
 		DisableStartupMessage: true,

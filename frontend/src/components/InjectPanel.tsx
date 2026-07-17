@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CATEGORY_META, DEFAULT_CATEGORY_META } from "@/lib/payloads";
@@ -191,32 +190,27 @@ export function InjectPanel({
       {(status === "injecting" || logs.length > 0) && (
         <div
           className={cn(
-            "relative overflow-hidden rounded-sm border border-border bg-[#050607] px-3 py-2",
-            status === "injecting" &&
-              "shadow-[inset_0_0_40px_-10px_var(--color-accent)]",
+            "relative rounded-sm border border-border bg-[#0a0b0c] px-3 py-2",
+            status === "injecting" && "border-accent/30",
           )}
         >
-          <ScrollArea className="h-32">
-            <div ref={scrollRef} className="flex flex-col gap-1 pr-2 font-mono text-sm">
-              {logs.map((line, i) => (
-                <div key={i} className="text-text-dim">
-                  <span className="text-text-faint">$ </span>
-                  {line}
-                </div>
-              ))}
-              {status === "error" && error && (
-                <div className="text-danger">
-                  <span className="text-text-faint">$ </span>
-                  error: {error}
-                </div>
-              )}
-              {status === "injecting" && (
-                <div className="text-accent">
-                  <span className="text-text-faint">$ </span>_
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+          <div ref={scrollRef} className="h-40 overflow-y-auto pr-2 font-mono text-xs leading-relaxed">
+            {logs.map((line, i) => (
+              <div key={i} className="text-text-dim">
+                <span className="text-text-faint opacity-50">› </span>
+                {line}
+              </div>
+            ))}
+            {status === "error" && error && (
+              <div className="text-danger">
+                <span className="text-text-faint opacity-50">› </span>
+                {error}
+              </div>
+            )}
+            {status === "injecting" && (
+              <div className="text-accent animate-pulse">_</div>
+            )}
+          </div>
         </div>
       )}
     </div>

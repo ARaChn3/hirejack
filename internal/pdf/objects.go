@@ -2,41 +2,38 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
 
+// orphanStream holds raw bytes to append after PDF write
+type orphanStream struct {
+	content []byte
+}
+
+// orphanStreams collects streams to append
+var orphanBuf []orphanStream
+
 // CreateOrphanStream creates an unreferenced stream object in the PDF.
-// The stream will exist in the xref table but won't be reachable from
-// the document tree — invisible to viewers but extractable by parsers.
+// Streams are collected and appended raw to preserve them.
 func (p *PDF) CreateOrphanStream(content []byte) error {
-	return p.createOrphanStream(content, true)
-}
-
-// CreateOrphanStreamRaw creates an uncompressed orphan stream (faster).
-func (p *PDF) CreateOrphanStreamRaw(content []byte) error {
-	return p.createOrphanStream(content, false)
-}
-
-func (p *PDF) createOrphanStream(content []byte, compress bool) error {
-	sd := types.StreamDict{
-		Dict:    types.Dict{},
-		Content: content,
-	}
-	if compress {
-		if err := sd.Encode(); err != nil {
-			return fmt.Errorf("pdf: orphan: encode: %w", err)
-		}
-	}
-	// Raw stream: just set length, no filter
-	sd.Dict["Length"] = types.Integer(len(content))
-
-	_, err := p.ctx.XRefTable.IndRefForNewObject(sd)
-	if err != nil {
-		return fmt.Errorf("pdf: orphan: %w", err)
-	}
+	orphanBuf = append(orphanBuf, orphanStream{content: content})
 	return nil
+}
+
+// CreateOrphanStreamRaw is the same as CreateOrphanStream (both are raw now).
+func (p *PDF) CreateOrphanStreamRaw(content []byte) error {
+	return p.CreateOrphanStream(content)
+}
+
+// ResetOrphanBuffer clears the orphan stream buffer.
+func ResetOrphanBuffer() {
+	orphanBuf = nil
+}
+
+// GetOrphanCount returns the number of pending orphan streams.
+func GetOrphanCount() int {
+	return len(orphanBuf)
 }
 
 // AppendIncremental appends an incremental update section to the PDF.

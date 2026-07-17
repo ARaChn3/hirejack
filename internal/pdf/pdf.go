@@ -54,15 +54,47 @@ func (p *PDF) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// BytesIncremental returns the PDF with changes appended incrementally.
-// This preserves orphan objects that would be removed by a full rewrite.
-func (p *PDF) BytesIncremental() ([]byte, error) {
-	// Start with original bytes
-	buf := bytes.NewBuffer(p.raw)
-	if err := api.WriteIncrement(p.ctx, buf); err != nil {
-		return nil, fmt.Errorf("pdf: write increment: %w", err)
+// BytesWithOrphans returns the PDF with orphan streams appended.
+// Orphan streams are inserted before %%EOF so they exist in the file
+// but aren't referenced from the document tree.
+func (p *PDF) BytesWithOrphans() ([]byte, error) {
+	pdfBytes, err := p.Bytes()
+	if err != nil {
+		return nil, err
 	}
-	return buf.Bytes(), nil
+
+	if len(orphanBuf) == 0 {
+		return pdfBytes, nil
+	}
+
+	// Find %%EOF and insert orphans before it
+	eofIdx := bytes.LastIndex(pdfBytes, []byte("%%EOF"))
+	if eofIdx == -1 {
+		eofIdx = len(pdfBytes)
+	}
+
+	var result bytes.Buffer
+	result.Write(pdfBytes[:eofIdx])
+
+	// Get next object number from xref
+	objNum := p.ObjectCount() + 1
+
+	// Append each orphan as a raw stream object
+	for _, o := range orphanBuf {
+		result.WriteString(fmt.Sprintf("\n%d 0 obj\n", objNum))
+		result.WriteString(fmt.Sprintf("<</Length %d>>\n", len(o.content)))
+		result.WriteString("stream\n")
+		result.Write(o.content)
+		result.WriteString("\nendstream\nendobj\n")
+		objNum++
+	}
+
+	result.WriteString("\n%%EOF\n")
+
+	// Clear buffer for next use
+	ResetOrphanBuffer()
+
+	return result.Bytes(), nil
 }
 
 // IsValid checks if the PDF is structurally valid per the PDF spec.
