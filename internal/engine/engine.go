@@ -4,6 +4,7 @@ package engine
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"hirejack/internal/canary"
 	"hirejack/internal/encoders"
 	"hirejack/internal/generators"
@@ -91,15 +92,26 @@ type InjectionPoint struct {
 
 // Inject applies payloads to a PDF.
 func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
+	log.Debug().
+		Int("pdf_size", len(req.PDF)).
+		Int("payload_ids", len(req.PayloadIDs)).
+		Str("profile", req.ProfileID).
+		Int("stealth", int(req.Stealth)).
+		Bool("canary", req.AddCanary).
+		Msg("engine: inject start")
+
 	doc, err := pdf.Parse(req.PDF)
 	if err != nil {
+		log.Debug().Err(err).Msg("engine: pdf parse failed")
 		return nil, fmt.Errorf("engine: parse: %w", err)
 	}
+	log.Debug().Msg("engine: pdf parsed")
 
 	stealth := req.Stealth
 	if stealth == 0 {
 		stealth = e.stealth
 	}
+	log.Debug().Int("stealth", int(stealth)).Msg("engine: using stealth level")
 
 	result := &InjectResult{
 		Injections: []InjectionPoint{},
@@ -107,18 +119,24 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 
 	// Get payloads
 	payloadList := e.resolvePayloads(req)
+	log.Debug().Int("resolved", len(payloadList)).Msg("engine: payloads resolved")
 
 	// Inject based on stealth level
 	switch {
 	case stealth >= StealthMax:
+		log.Debug().Msg("engine: using injectMax (L5)")
 		e.injectMax(doc, payloadList, result)
 	case stealth >= StealthOrphan:
+		log.Debug().Msg("engine: using injectOrphan (L4)")
 		e.injectOrphan(doc, payloadList, result)
 	case stealth >= StealthSplit:
+		log.Debug().Msg("engine: using injectSplit (L3)")
 		e.injectSplit(doc, payloadList, result)
 	case stealth >= StealthHex:
+		log.Debug().Msg("engine: using injectHex (L2)")
 		e.injectHex(doc, payloadList, result)
 	default:
+		log.Debug().Msg("engine: using injectBasic (L1)")
 		e.injectBasic(doc, payloadList, result)
 	}
 
@@ -156,8 +174,15 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 
 	result.PDF, err = doc.Bytes()
 	if err != nil {
+		log.Debug().Err(err).Msg("engine: pdf write failed")
 		return nil, fmt.Errorf("engine: write: %w", err)
 	}
+
+	log.Debug().
+		Int("injections", len(result.Injections)).
+		Int("output_size", len(result.PDF)).
+		Bool("has_canary", result.CanaryToken != nil).
+		Msg("engine: inject complete")
 
 	return result, nil
 }
@@ -189,24 +214,39 @@ func (e *Engine) CanaryStore() *canary.Store {
 
 func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 	var list []payloads.Payload
+	var notFound []string
 
 	if req.ProfileID != "" {
 		if profile := payloads.GetProfile(req.ProfileID); profile != nil {
+			log.Debug().Str("profile", req.ProfileID).Int("count", len(profile)).Msg("engine: using profile")
 			for _, id := range profile {
 				if p := payloads.GetPayload(id); p != nil {
 					list = append(list, *p)
+				} else {
+					notFound = append(notFound, id)
 				}
 			}
+		} else {
+			log.Debug().Str("profile", req.ProfileID).Msg("engine: profile not found")
 		}
 	}
 
 	for _, id := range req.PayloadIDs {
 		if p := payloads.GetPayload(id); p != nil {
+			log.Debug().Str("id", id).Msg("engine: payload found")
 			list = append(list, *p)
+		} else {
+			log.Debug().Str("id", id).Msg("engine: payload NOT found")
+			notFound = append(notFound, id)
 		}
 	}
 
+	if len(notFound) > 0 {
+		log.Debug().Strs("missing", notFound).Msg("engine: some payloads not found")
+	}
+
 	// Fill empty templates with generated content
+	generated := 0
 	for i := range list {
 		if list[i].Template == "" {
 			catID := ""
@@ -220,8 +260,14 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 			}
 			if catID != "" {
 				list[i].Template = e.payloadGen.FillTemplate(catID + "." + list[i].ID)
+				if list[i].Template != "" {
+					generated++
+				}
 			}
 		}
+	}
+	if generated > 0 {
+		log.Debug().Int("count", generated).Msg("engine: templates generated from SecLists")
 	}
 
 	return list
@@ -232,12 +278,17 @@ func (e *Engine) injectBasic(doc *pdf.PDF, plist []payloads.Payload, result *Inj
 	fields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
 	buckets := make(map[string][]string)
 
+	skipped := 0
 	for i, p := range plist {
 		if p.Template == "" {
+			skipped++
 			continue
 		}
 		field := fields[i%len(fields)]
 		buckets[field] = append(buckets[field], p.Template)
+	}
+	if skipped > 0 {
+		log.Debug().Int("skipped", skipped).Msg("engine: payloads with empty templates")
 	}
 
 	// Inject concatenated payloads
@@ -341,8 +392,10 @@ func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *Injec
 	metaBuckets := make(map[string][]string)
 	var xmpPayloads, orphanPayloads []string
 
+	skipped := 0
 	for i, p := range plist {
 		if p.Template == "" {
+			skipped++
 			continue
 		}
 
@@ -357,6 +410,17 @@ func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *Injec
 			orphanPayloads = append(orphanPayloads, p.Template)
 		}
 	}
+
+	metaCount := 0
+	for _, v := range metaBuckets {
+		metaCount += len(v)
+	}
+	log.Debug().
+		Int("metadata", metaCount).
+		Int("xmp", len(xmpPayloads)).
+		Int("orphan", len(orphanPayloads)).
+		Int("skipped", skipped).
+		Msg("engine: L5 distribution")
 
 	// Inject metadata (hex encoded, concatenated)
 	for _, field := range metaFields {

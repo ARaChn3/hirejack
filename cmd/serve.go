@@ -34,12 +34,19 @@ var serveCmd = &cobra.Command{
 	},
 }
 
+var debug bool
+
 func init() {
 	serveCmd.Flags().StringVarP(&port, "port", "p", "8080", "server port")
 	serveCmd.Flags().BoolVar(&headless, "headless", false, "don't open browser")
+	serveCmd.Flags().BoolVar(&debug, "debug", true, "enable debug logging")
 }
 
 func runServer() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
 	log.Logger = log.Output(zerolog.ConsoleWriter{
 		Out:        os.Stdout,
 		TimeFormat: "15:04:05",
