@@ -135,7 +135,7 @@ function CategoryCard({
 
   return (
     <Collapsible
-      defaultOpen
+      defaultOpen={false}
       className={cn(
         "rounded-sm border border-l-2 border-border bg-panel",
         LANE_BORDER[meta.color],
