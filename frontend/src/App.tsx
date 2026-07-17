@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { BackdropShader } from "@/components/BackdropShader";
 import { TopBar } from "@/components/TopBar";
 import { Hero } from "@/components/Hero";
@@ -34,6 +34,7 @@ async function runInject(
   file: FileMeta,
   selected: Set<string>,
   dispatch: React.Dispatch<Parameters<typeof reducer>[1]>,
+  canaryUrl?: string,
 ) {
   dispatch({ type: "START_INJECT" });
 
@@ -58,6 +59,7 @@ async function runInject(
         stealth: 5, // Max stealth
         add_canary: true,
         canary_label: file.file.name,
+        canary_url: canaryUrl || undefined,
       }),
     });
 
@@ -97,6 +99,7 @@ function stageState(unlocked: boolean, complete: boolean): StageState {
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [canaryUrl, setCanaryUrl] = useState("");
   const toolRef = useRef<HTMLDivElement>(null);
 
   function scrollToTool() {
@@ -172,9 +175,11 @@ function App() {
             status={state.status}
             logs={state.logs}
             error={state.error}
+            canaryUrl={canaryUrl}
+            onCanaryUrlChange={setCanaryUrl}
             onRemove={(key) => dispatch({ type: "TOGGLE_PAYLOAD", key })}
             onInject={() => {
-              if (state.file) void runInject(state.file, state.selected, dispatch);
+              if (state.file) void runInject(state.file, state.selected, dispatch, canaryUrl);
             }}
           />
         </Stage>
@@ -200,7 +205,7 @@ function App() {
               size="sm"
               disabled={!stage03Unlocked || state.status === "injecting"}
               onClick={() => {
-                if (state.file) void runInject(state.file, state.selected, dispatch);
+                if (state.file) void runInject(state.file, state.selected, dispatch, canaryUrl);
               }}
               className="rounded-sm font-mono tracking-wide"
             >

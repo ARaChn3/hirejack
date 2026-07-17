@@ -64,13 +64,14 @@ func (e *Engine) SetStealth(level StealthLevel) {
 
 // InjectRequest specifies what to inject.
 type InjectRequest struct {
-	PDF         []byte           `json:"pdf"`          // Source PDF
-	PayloadIDs  []string         `json:"payload_ids"`  // From registry
-	ProfileID   string           `json:"profile_id"`   // Or use a profile
-	CustomData  map[string]string `json:"custom_data"` // Custom fields
-	Stealth     StealthLevel     `json:"stealth"`      // Override stealth
-	AddCanary   bool             `json:"add_canary"`   // Add canary token
-	CanaryLabel string           `json:"canary_label"` // Label for canary
+	PDF         []byte            `json:"pdf"`          // Source PDF
+	PayloadIDs  []string          `json:"payload_ids"`  // From registry
+	ProfileID   string            `json:"profile_id"`   // Or use a profile
+	CustomData  map[string]string `json:"custom_data"`  // Custom fields
+	Stealth     StealthLevel      `json:"stealth"`      // Override stealth
+	AddCanary   bool              `json:"add_canary"`   // Add canary token
+	CanaryLabel string            `json:"canary_label"` // Label for canary
+	CanaryURL   string            `json:"canary_url"`   // Custom callback URL (overrides default)
 }
 
 // InjectResult contains the modified PDF and metadata.
@@ -123,7 +124,12 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 
 	// Add canary if requested
 	if req.AddCanary {
-		token := e.canaryStore.Generate(e.canaryURL, req.CanaryLabel)
+		// Use custom canary URL if provided, otherwise use default
+		canaryURL := e.canaryURL
+		if req.CanaryURL != "" {
+			canaryURL = req.CanaryURL
+		}
+		token := e.canaryStore.Generate(canaryURL, req.CanaryLabel)
 		e.xmpInjector.InjectXXE(doc,
 			fmt.Sprintf(`<!ENTITY canary SYSTEM "%s">`, token.CallbackURL),
 			"dc:creator",

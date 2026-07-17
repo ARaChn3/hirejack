@@ -99,6 +99,7 @@ type InjectRequest struct {
 	Stealth     int               `json:"stealth"`
 	AddCanary   bool              `json:"add_canary"`
 	CanaryLabel string            `json:"canary_label"`
+	CanaryURL   string            `json:"canary_url"`   // Custom callback URL (for remote auditing)
 }
 
 // InjectResponse is the API response for injection.
@@ -139,6 +140,7 @@ func (s *Server) Inject(c *fiber.Ctx) error {
 		Stealth:     engine.StealthLevel(req.Stealth),
 		AddCanary:   req.AddCanary,
 		CanaryLabel: req.CanaryLabel,
+		CanaryURL:   req.CanaryURL,
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("inject: engine failed")

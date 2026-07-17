@@ -38,6 +38,8 @@ export function InjectPanel({
   status,
   logs,
   error,
+  canaryUrl,
+  onCanaryUrlChange,
   onRemove,
   onInject,
 }: {
@@ -46,6 +48,8 @@ export function InjectPanel({
   status: Status;
   logs: string[];
   error: string | null;
+  canaryUrl: string;
+  onCanaryUrlChange: (url: string) => void;
   onRemove: (key: string) => void;
   onInject: () => void;
 }) {
@@ -102,6 +106,21 @@ export function InjectPanel({
             {armedKeys.length} payload{armedKeys.length === 1 ? "" : "s"} armed
           </p>
         )}
+      </div>
+
+      {/* Callback URL for remote auditing */}
+      <div className="flex flex-col gap-1.5">
+        <label className="font-mono text-xs text-text-faint">
+          callback url (optional — for remote canary tokens)
+        </label>
+        <input
+          type="url"
+          placeholder="https://your-server.com/callback"
+          value={canaryUrl}
+          onChange={(e) => onCanaryUrlChange(e.target.value)}
+          disabled={status === "injecting"}
+          className="w-full rounded-sm border border-border bg-panel px-3 py-2 font-mono text-sm text-text placeholder:text-text-faint focus:border-accent focus:outline-none disabled:opacity-50"
+        />
       </div>
 
       <div className="flex items-center gap-3">
