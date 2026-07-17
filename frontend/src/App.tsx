@@ -1,6 +1,7 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { BackdropShader } from "@/components/BackdropShader";
 import { TopBar } from "@/components/TopBar";
+import { Hero } from "@/components/Hero";
 import { Stage, type StageState } from "@/components/Stage";
 import { SourcePanel } from "@/components/SourcePanel";
 import { PayloadMatrix } from "@/components/PayloadMatrix";
@@ -11,6 +12,24 @@ import { reducer, initialState } from "@/reducer";
 import { delay, mkArtifactFilename } from "@/lib/format";
 import type { Category, FileMeta } from "@/types";
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToBlob(base64: string, type: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type });
+}
+
 async function runInject(
   file: FileMeta,
   selected: Set<string>,
@@ -19,27 +38,46 @@ async function runInject(
   dispatch({ type: "START_INJECT" });
 
   const payloadIds = [...selected].map((k) => k.split(":")[1]);
-  const steps = [
-    "target loaded ✓",
-    "parsing pdf object graph...",
-    `resolving xref table (${selected.size} payload${selected.size === 1 ? "" : "s"} queued)`,
-    `writing payload${payloadIds.length === 1 ? "" : "s"}: ${payloadIds.join(", ")}`,
-    "reserializing document...",
-    "finalizing artifact...",
-  ];
 
-  for (const line of steps) {
-    await delay(280 + Math.random() * 280);
-    dispatch({ type: "LOG", line });
-  }
+  dispatch({ type: "LOG", line: "target loaded ✓" });
+  await delay(200);
+  dispatch({ type: "LOG", line: "encoding pdf..." });
 
   try {
-    // NOTE: POST /api/inject is currently a stub on the backend — mock the
-    // artifact client-side so the pipeline is fully exercisable end to end.
     const buf = await file.file.arrayBuffer();
-    const padding = new Uint8Array(Math.floor(buf.byteLength * 0.15) + 2048 * selected.size).fill(0x20);
-    const blob = new Blob([buf, padding], { type: "application/pdf" });
-    await delay(250);
+    const pdfBase64 = arrayBufferToBase64(buf);
+
+    dispatch({ type: "LOG", line: `sending to injection engine (${payloadIds.length} payloads)...` });
+
+    const res = await fetch("/api/inject", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pdf: pdfBase64,
+        payload_ids: payloadIds,
+        stealth: 5, // Max stealth
+        add_canary: true,
+        canary_label: file.file.name,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    for (const inj of data.injections || []) {
+      dispatch({ type: "LOG", line: `injected: ${inj.location}/${inj.field || "stream"} ${inj.encoded ? "(encoded)" : ""}` });
+      await delay(100);
+    }
+
+    if (data.canary_token) {
+      dispatch({ type: "LOG", line: `canary token: ${data.canary_token.id}` });
+    }
+
+    const blob = base64ToBlob(data.pdf, "application/pdf");
     dispatch({ type: "LOG", line: `done — ${selected.size} payload${selected.size === 1 ? "" : "s"} embedded` });
     dispatch({
       type: "INJECT_SUCCESS",
@@ -59,6 +97,11 @@ function stageState(unlocked: boolean, complete: boolean): StageState {
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const toolRef = useRef<HTMLDivElement>(null);
+
+  function scrollToTool() {
+    toolRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
 
   useEffect(() => {
     fetch("/api/payloads")
@@ -86,7 +129,16 @@ function App() {
       <BackdropShader />
       <TopBar status={state.status} />
 
-      <main className="mx-auto max-w-[880px] px-4 pt-24 pb-32">
+      <Hero onScrollToTool={scrollToTool} />
+
+      <main ref={toolRef} className="mx-auto max-w-[880px] px-4 pt-24 pb-32">
+        <div className="mb-12 border-b border-border pb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-text">Injection Pipeline</h2>
+          <p className="mt-2 text-text-dim">
+            Upload a resume, select payloads, and generate a poisoned artifact.
+          </p>
+        </div>
+
         <Stage index="01" title="Source" state={stageState(true, stage02Unlocked)}>
           <SourcePanel
             file={state.file}

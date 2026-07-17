@@ -3,10 +3,11 @@ package server
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/novusedge/hirejack/internal/canary"
-	"github.com/novusedge/hirejack/internal/engine"
-	"github.com/novusedge/hirejack/internal/generators"
-	"github.com/novusedge/hirejack/internal/payloads"
+	"hirejack/internal/canary"
+	"hirejack/internal/engine"
+	"hirejack/internal/generators"
+	"hirejack/internal/payloads"
+	"github.com/rs/zerolog/log"
 )
 
 // Server holds the engine and provides HTTP handlers.
@@ -23,6 +24,9 @@ func New(canaryURL string) *Server {
 
 // RegisterRoutes registers API routes on the Fiber app.
 func (s *Server) RegisterRoutes(app *fiber.App) {
+	// Docs page
+	app.Get("/docs", s.ServeDocs)
+
 	api := app.Group("/api")
 
 	// Payloads
@@ -47,7 +51,15 @@ func (s *Server) RegisterRoutes(app *fiber.App) {
 
 // GetPayloads returns all payload categories.
 func (s *Server) GetPayloads(c *fiber.Ctx) error {
-	return c.JSON(payloads.Registry)
+	total := 0
+	for _, cat := range payloads.Registry {
+		total += len(cat.Payloads)
+	}
+	log.Info().
+		Int("categories", len(payloads.Registry)).
+		Int("payloads", total).
+		Msg("payload catalog requested")
+	return c.JSON(fiber.Map{"categories": payloads.Registry})
 }
 
 // GetPayloadsByCategory returns payloads for a specific category.
@@ -100,14 +112,24 @@ type InjectResponse struct {
 func (s *Server) Inject(c *fiber.Ctx) error {
 	var req InjectRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn().Err(err).Msg("inject: invalid request body")
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	// Decode base64 PDF
 	pdfData, err := decodeBase64(req.PDF)
 	if err != nil {
+		log.Warn().Msg("inject: invalid base64 PDF")
 		return c.Status(400).JSON(fiber.Map{"error": "invalid PDF encoding"})
 	}
+
+	log.Info().
+		Int("pdf_size", len(pdfData)).
+		Int("payloads", len(req.PayloadIDs)).
+		Str("profile", req.ProfileID).
+		Int("stealth", req.Stealth).
+		Bool("canary", req.AddCanary).
+		Msg("inject: processing")
 
 	result, err := s.engine.Inject(engine.InjectRequest{
 		PDF:         pdfData,
@@ -119,8 +141,15 @@ func (s *Server) Inject(c *fiber.Ctx) error {
 		CanaryLabel: req.CanaryLabel,
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("inject: engine failed")
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	log.Info().
+		Int("injections", len(result.Injections)).
+		Int("output_size", len(result.PDF)).
+		Bool("has_canary", result.CanaryToken != nil).
+		Msg("inject: complete")
 
 	return c.JSON(InjectResponse{
 		PDF:         encodeBase64(result.PDF),
@@ -147,12 +176,18 @@ func (s *Server) GenerateCV(c *fiber.Ctx) error {
 	ids := req.PayloadIDs
 	if req.ProfileID != "" {
 		ids = payloads.GetProfile(req.ProfileID)
+		log.Info().Str("profile", req.ProfileID).Int("payloads", len(ids)).Msg("generate: using profile")
 	}
+
+	log.Info().Int("payloads", len(ids)).Int("stealth", req.Stealth).Msg("generate: creating CV")
 
 	result, err := s.engine.GenerateCV(ids, engine.StealthLevel(req.Stealth))
 	if err != nil {
+		log.Error().Err(err).Msg("generate: failed")
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	log.Info().Int("injections", len(result.Injections)).Int("size", len(result.PDF)).Msg("generate: complete")
 
 	return c.JSON(InjectResponse{
 		PDF:         encodeBase64(result.PDF),
@@ -182,13 +217,18 @@ func (s *Server) HandleCallback(c *fiber.Ctx) error {
 
 	s.engine.CanaryStore().RecordCallback(id, cb)
 
+	log.Warn().
+		Str("canary_id", id).
+		Str("ip", cb.IP).
+		Str("user_agent", cb.UserAgent).
+		Msg("🚨 canary triggered!")
+
 	// Return 204 No Content for XXE/image callbacks
 	return c.SendStatus(204)
 }
 
 // HandleCallbackImage handles image-based callbacks.
 func (s *Server) HandleCallbackImage(c *fiber.Ctx) error {
-	// Remove .png suffix
 	id := c.Params("id")
 
 	cb := canary.Callback{
@@ -197,6 +237,12 @@ func (s *Server) HandleCallbackImage(c *fiber.Ctx) error {
 	}
 
 	s.engine.CanaryStore().RecordCallback(id, cb)
+
+	log.Warn().
+		Str("canary_id", id).
+		Str("ip", cb.IP).
+		Str("user_agent", cb.UserAgent).
+		Msg("🚨 canary image triggered!")
 
 	// Return 1x1 transparent PNG
 	c.Set("Content-Type", "image/png")

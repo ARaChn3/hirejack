@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 // XMPInjector injects payloads into XMP metadata.

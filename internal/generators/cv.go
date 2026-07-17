@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 // CVGenerator creates PDFs from personas.

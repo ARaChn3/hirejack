@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 func setupApp() *fiber.App {

@@ -1,7 +1,7 @@
 package injectors
 
 import (
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 // OrphanInjector creates unreferenced objects in the PDF.

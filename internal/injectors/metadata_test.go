@@ -3,7 +3,7 @@ package injectors
 import (
 	"testing"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 func TestMetadataInjector_Inject(t *testing.T) {

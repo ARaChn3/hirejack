@@ -1,7 +1,18 @@
+export type Payload = {
+  id: string;
+  name: string;
+  description: string;
+  impact: string;
+  stealth: number[];
+  locations: string[];
+};
+
 export type Category = {
   id: string;
   name: string;
-  payloads: string[];
+  description: string;
+  color: string;
+  payloads: Payload[];
 };
 
 export type Status = "idle" | "armed" | "injecting" | "done" | "error";

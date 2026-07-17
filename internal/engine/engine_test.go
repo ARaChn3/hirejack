@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 func TestNew(t *testing.T) {

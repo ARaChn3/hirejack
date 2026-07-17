@@ -1,12 +1,14 @@
-export function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number, showSign = false): string {
   if (bytes === 0) return "0 B";
+  const sign = bytes < 0 ? "-" : showSign ? "+" : "";
+  const abs = Math.abs(bytes);
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.min(
     units.length - 1,
-    Math.floor(Math.log(bytes) / Math.log(1024)),
+    Math.floor(Math.log(abs) / Math.log(1024)),
   );
-  const value = bytes / 1024 ** i;
-  return `${i === 0 ? value : value.toFixed(2)} ${units[i]}`;
+  const value = abs / 1024 ** i;
+  return `${sign}${i === 0 ? value : value.toFixed(2)} ${units[i]}`;
 }
 
 export async function sha256Hex(buf: ArrayBuffer): Promise<string> {

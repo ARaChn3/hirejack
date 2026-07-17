@@ -3,7 +3,6 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { formatBytes } from "@/lib/format";
 import { CATEGORY_META, DEFAULT_CATEGORY_META } from "@/lib/payloads";
 import type { FileMeta, Status } from "@/types";
 
@@ -58,7 +57,6 @@ export function InjectPanel({
   }, [logs]);
 
   const armedKeys = [...selected];
-  const estBytes = file ? Math.round(file.size * 0.15) + 2048 * armedKeys.length : 0;
 
   const reason = !file
     ? "load a resume"
@@ -101,8 +99,7 @@ export function InjectPanel({
         )}
         {armedKeys.length > 0 && (
           <p className="mt-2 font-mono text-sm text-text-dim">
-            {armedKeys.length} payload{armedKeys.length === 1 ? "" : "s"} armed · est. artifact +
-            {formatBytes(estBytes)}
+            {armedKeys.length} payload{armedKeys.length === 1 ? "" : "s"} armed
           </p>
         )}
       </div>

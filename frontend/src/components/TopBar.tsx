@@ -69,12 +69,11 @@ function ThemeToggle() {
 
 export function TopBar({ status }: { status: Status }) {
   return (
-    <header className="fixed inset-x-0 top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-12 max-w-[880px] items-center justify-between px-4">
-        <div className="flex items-baseline gap-1 font-mono text-sm">
-          <span className="text-text">hirejack</span>
+    <header className="fixed inset-x-0 top-4 z-20 flex justify-center px-4">
+      <div className="flex h-12 w-full max-w-[720px] items-center justify-between rounded-full border border-border/50 bg-panel/80 px-5 shadow-lg shadow-black/20 backdrop-blur-xl">
+        <div className="flex items-baseline gap-1.5 font-mono text-sm">
+          <span className="font-semibold text-text">hirejack</span>
           <span className="text-accent">▸</span>
-          <span className="text-text-faint">ats audit</span>
         </div>
         <div className="flex items-center gap-3">
           <StatusPill status={status} />

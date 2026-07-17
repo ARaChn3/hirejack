@@ -54,8 +54,8 @@ export function ArtifactPanel({
           </div>
           <div>
             <dt className="text-text-faint">delta</dt>
-            <dd className="text-accent">
-              +{formatBytes(delta)}
+            <dd className={delta >= 0 ? "text-accent" : "text-warn"}>
+              {formatBytes(delta, true)}
             </dd>
           </div>
           <div>

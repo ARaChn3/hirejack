@@ -4,7 +4,7 @@ package injectors
 import (
 	"strings"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 // MetadataInjector injects payloads into Document Info Dict.

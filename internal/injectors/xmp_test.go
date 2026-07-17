@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/pdf"
 )
 
 func TestXMPInjector_InjectFields(t *testing.T) {

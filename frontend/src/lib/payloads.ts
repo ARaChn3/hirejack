@@ -6,8 +6,10 @@ export const CATEGORY_META: Record<
 > = {
   dos: { color: "danger", impact: "high", warnGlyph: true },
   sqli: { color: "warn", impact: "injection", warnGlyph: true },
+  xxe: { color: "danger", impact: "critical", warnGlyph: true },
   integrity: { color: "info", impact: "silent", warnGlyph: false },
   ml_poison: { color: "accent", impact: "signature", warnGlyph: false },
+  llm_injection: { color: "danger", impact: "critical", warnGlyph: true },
 };
 
 export const DEFAULT_CATEGORY_META = {

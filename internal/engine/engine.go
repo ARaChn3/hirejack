@@ -4,12 +4,12 @@ package engine
 import (
 	"fmt"
 
-	"github.com/novusedge/hirejack/internal/canary"
-	"github.com/novusedge/hirejack/internal/encoders"
-	"github.com/novusedge/hirejack/internal/generators"
-	"github.com/novusedge/hirejack/internal/injectors"
-	"github.com/novusedge/hirejack/internal/payloads"
-	"github.com/novusedge/hirejack/internal/pdf"
+	"hirejack/internal/canary"
+	"hirejack/internal/encoders"
+	"hirejack/internal/generators"
+	"hirejack/internal/injectors"
+	"hirejack/internal/payloads"
+	"hirejack/internal/pdf"
 )
 
 // StealthLevel defines how hidden payloads are.
@@ -37,6 +37,7 @@ type Engine struct {
 	splitEncoder   *encoders.SplitEncoder
 	personaGen     *generators.PersonaGenerator
 	cvGen          *generators.CVGenerator
+	payloadGen     *payloads.Generator
 }
 
 // New creates a new engine.
@@ -52,6 +53,7 @@ func New(canaryURL string) *Engine {
 		splitEncoder:   encoders.NewSplitEncoder(),
 		personaGen:     generators.NewPersonaGenerator(),
 		cvGen:          generators.NewCVGenerator(nil),
+		payloadGen:     payloads.NewGenerator(0), // seed 0 = time-based
 	}
 }
 
@@ -195,6 +197,24 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 	for _, id := range req.PayloadIDs {
 		if p := payloads.GetPayload(id); p != nil {
 			list = append(list, *p)
+		}
+	}
+
+	// Fill empty templates with generated content
+	for i := range list {
+		if list[i].Template == "" {
+			catID := ""
+			for _, cat := range payloads.Registry {
+				for _, p := range cat.Payloads {
+					if p.ID == list[i].ID {
+						catID = cat.ID
+						break
+					}
+				}
+			}
+			if catID != "" {
+				list[i].Template = e.payloadGen.FillTemplate(catID + "." + list[i].ID)
+			}
 		}
 	}
 
