@@ -32,12 +32,22 @@ function useElapsed(active: boolean) {
   return ms;
 }
 
+const STEALTH_LEVELS = [
+  { level: 1, label: "L1 — Basic", desc: "Raw payloads in metadata" },
+  { level: 2, label: "L2 — Hex", desc: "Hex-encoded metadata" },
+  { level: 3, label: "L3 — Split", desc: "Split across fields" },
+  { level: 4, label: "L4 — Orphan", desc: "Hidden orphan streams" },
+  { level: 5, label: "L5 — Max", desc: "All techniques combined" },
+];
+
 export function InjectPanel({
   file,
   selected,
   status,
   logs,
   error,
+  stealth,
+  onStealthChange,
   canaryUrl,
   onCanaryUrlChange,
   onRemove,
@@ -48,6 +58,8 @@ export function InjectPanel({
   status: Status;
   logs: string[];
   error: string | null;
+  stealth: number;
+  onStealthChange: (level: number) => void;
   canaryUrl: string;
   onCanaryUrlChange: (url: string) => void;
   onRemove: (key: string) => void;
@@ -106,6 +118,33 @@ export function InjectPanel({
             {armedKeys.length} payload{armedKeys.length === 1 ? "" : "s"} armed
           </p>
         )}
+      </div>
+
+      {/* Stealth level selector */}
+      <div className="flex flex-col gap-1.5">
+        <label className="font-mono text-xs text-text-faint">stealth level</label>
+        <div className="flex flex-wrap gap-1.5">
+          {STEALTH_LEVELS.map((s) => (
+            <button
+              key={s.level}
+              type="button"
+              onClick={() => onStealthChange(s.level)}
+              disabled={status === "injecting"}
+              title={s.desc}
+              className={cn(
+                "rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
+                stealth === s.level
+                  ? "border-accent bg-accent/20 text-accent"
+                  : "border-border bg-panel text-text-dim hover:border-accent/50 hover:text-text"
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <p className="font-mono text-xs text-text-faint">
+          {STEALTH_LEVELS.find((s) => s.level === stealth)?.desc}
+        </p>
       </div>
 
       {/* Callback URL for remote auditing */}
