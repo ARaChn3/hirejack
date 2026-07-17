@@ -222,44 +222,94 @@ func (e *Engine) resolvePayloads(req InjectRequest) []payloads.Payload {
 }
 
 func (e *Engine) injectBasic(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
-	for _, p := range plist {
-		e.metaInjector.InjectField(doc, "Author", p.Template)
-		result.Injections = append(result.Injections, InjectionPoint{
-			Location: "metadata",
-			Field:    "Author",
-			Payload:  p.Template,
-		})
+	// Group payloads by target field, concatenate with separator
+	fields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
+	buckets := make(map[string][]string)
+
+	for i, p := range plist {
+		if p.Template == "" {
+			continue
+		}
+		field := fields[i%len(fields)]
+		buckets[field] = append(buckets[field], p.Template)
+	}
+
+	// Inject concatenated payloads
+	for _, field := range fields {
+		if payloads, ok := buckets[field]; ok && len(payloads) > 0 {
+			combined := ""
+			for i, p := range payloads {
+				if i > 0 {
+					combined += " | "
+				}
+				combined += p
+			}
+			e.metaInjector.InjectField(doc, field, combined)
+			result.Injections = append(result.Injections, InjectionPoint{
+				Location: "metadata",
+				Field:    field,
+				Payload:  combined,
+			})
+		}
 	}
 }
 
 func (e *Engine) injectHex(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
-	for _, p := range plist {
+	fields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
+
+	for i, p := range plist {
+		if p.Template == "" {
+			continue
+		}
 		encoded := e.hexEncoder.Encode(p.Template)
-		e.metaInjector.InjectField(doc, "Author", encoded)
-		result.Injections = append(result.Injections, InjectionPoint{
-			Location: "metadata",
-			Field:    "Author",
-			Payload:  p.Template,
-			Encoded:  true,
-		})
+		if i >= len(fields) {
+			doc.CreateOrphanStream([]byte(encoded))
+			result.Injections = append(result.Injections, InjectionPoint{
+				Location: "orphan",
+				Payload:  p.Template,
+				Encoded:  true,
+			})
+		} else {
+			field := fields[i%len(fields)]
+			e.metaInjector.InjectField(doc, field, encoded)
+			result.Injections = append(result.Injections, InjectionPoint{
+				Location: "metadata",
+				Field:    field,
+				Payload:  p.Template,
+				Encoded:  true,
+			})
+		}
 	}
 }
 
 func (e *Engine) injectSplit(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
+	// Split mode: first 6 payloads get split across metadata fields,
+	// rest go to orphan streams
 	fields := []string{"Author", "Title", "Subject", "Keywords", "Creator", "Producer"}
 
-	for _, p := range plist {
-		sr, _ := e.splitEncoder.SplitString(p.Template)
-		for i, frag := range sr.Fragments {
-			if i >= len(fields) {
-				break
+	for i, p := range plist {
+		if p.Template == "" {
+			continue
+		}
+		if i < len(fields) {
+			sr, _ := e.splitEncoder.SplitString(p.Template)
+			for j, frag := range sr.Fragments {
+				if j >= len(fields) {
+					break
+				}
+				e.metaInjector.InjectField(doc, fields[j], string(frag.Content))
+				result.Injections = append(result.Injections, InjectionPoint{
+					Location: "metadata",
+					Field:    fields[j],
+					Payload:  string(frag.Content),
+					Encoded:  true,
+				})
 			}
-			e.metaInjector.InjectField(doc, fields[i], string(frag.Content))
+		} else {
+			doc.CreateOrphanStream([]byte(p.Template))
 			result.Injections = append(result.Injections, InjectionPoint{
-				Location: "metadata",
-				Field:    fields[i],
-				Payload:  string(frag.Content),
-				Encoded:  true,
+				Location: "orphan",
+				Payload:  p.Template,
 			})
 		}
 	}
@@ -267,6 +317,9 @@ func (e *Engine) injectSplit(doc *pdf.PDF, plist []payloads.Payload, result *Inj
 
 func (e *Engine) injectOrphan(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
 	for _, p := range plist {
+		if p.Template == "" {
+			continue
+		}
 		doc.CreateOrphanStream([]byte(p.Template))
 		result.Injections = append(result.Injections, InjectionPoint{
 			Location: "orphan",
@@ -276,31 +329,67 @@ func (e *Engine) injectOrphan(doc *pdf.PDF, plist []payloads.Payload, result *In
 }
 
 func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
-	// Combine all techniques
+	// Max stealth: distribute payloads across techniques
+	// Bucket by location type, then inject combined
+	metaFields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
+	metaBuckets := make(map[string][]string)
+	var xmpPayloads, orphanPayloads []string
+
 	for i, p := range plist {
-		switch i % 4 {
-		case 0:
-			encoded := e.hexEncoder.Encode(p.Template)
-			e.metaInjector.InjectField(doc, "Author", encoded)
+		if p.Template == "" {
+			continue
+		}
+
+		// Round-robin across techniques
+		switch i % 3 {
+		case 0: // metadata
+			field := metaFields[i%len(metaFields)]
+			metaBuckets[field] = append(metaBuckets[field], p.Template)
+		case 1: // xmp
+			xmpPayloads = append(xmpPayloads, p.Template)
+		case 2: // orphan
+			orphanPayloads = append(orphanPayloads, p.Template)
+		}
+	}
+
+	// Inject metadata (hex encoded, concatenated)
+	for _, field := range metaFields {
+		if payloads, ok := metaBuckets[field]; ok && len(payloads) > 0 {
+			combined := ""
+			for i, p := range payloads {
+				if i > 0 {
+					combined += " "
+				}
+				combined += p
+			}
+			encoded := e.hexEncoder.Encode(combined)
+			e.metaInjector.InjectField(doc, field, encoded)
 			result.Injections = append(result.Injections, InjectionPoint{
-				Location: "metadata", Field: "Author", Payload: p.Template, Encoded: true,
-			})
-		case 1:
-			e.xmpInjector.Inject(doc, injectors.XMPConfig{Creator: p.Template})
-			result.Injections = append(result.Injections, InjectionPoint{
-				Location: "xmp", Field: "dc:creator", Payload: p.Template,
-			})
-		case 2:
-			doc.CreateOrphanStream([]byte(p.Template))
-			result.Injections = append(result.Injections, InjectionPoint{
-				Location: "orphan", Payload: p.Template,
-			})
-		case 3:
-			encoded := e.hexEncoder.EncodeAll(p.Template)
-			e.metaInjector.InjectField(doc, "Subject", encoded)
-			result.Injections = append(result.Injections, InjectionPoint{
-				Location: "metadata", Field: "Subject", Payload: p.Template, Encoded: true,
+				Location: "metadata", Field: field, Payload: combined, Encoded: true,
 			})
 		}
+	}
+
+	// Inject XMP (concatenated into creator field)
+	if len(xmpPayloads) > 0 {
+		combined := ""
+		for i, p := range xmpPayloads {
+			if i > 0 {
+				combined += " | "
+			}
+			combined += p
+		}
+		e.xmpInjector.Inject(doc, injectors.XMPConfig{Creator: combined})
+		result.Injections = append(result.Injections, InjectionPoint{
+			Location: "xmp", Field: "dc:creator", Payload: combined,
+		})
+	}
+
+	// Inject orphan streams (one per payload for max coverage)
+	for _, p := range orphanPayloads {
+		doc.CreateOrphanStream([]byte(p))
+		result.Injections = append(result.Injections, InjectionPoint{
+			Location: "orphan", Payload: p,
+		})
 	}
 }
