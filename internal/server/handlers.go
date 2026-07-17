@@ -97,6 +97,7 @@ type InjectRequest struct {
 	ProfileID   string            `json:"profile_id"`
 	CustomData  map[string]string `json:"custom_data"`
 	Stealth     int               `json:"stealth"`
+	Fast        bool              `json:"fast"`         // Skip compression for speed
 	AddCanary   bool              `json:"add_canary"`
 	CanaryLabel string            `json:"canary_label"`
 	CanaryURL   string            `json:"canary_url"`   // Custom callback URL (for remote auditing)
@@ -129,6 +130,7 @@ func (s *Server) Inject(c *fiber.Ctx) error {
 		Int("payloads", len(req.PayloadIDs)).
 		Str("profile", req.ProfileID).
 		Int("stealth", req.Stealth).
+		Bool("fast", req.Fast).
 		Bool("canary", req.AddCanary).
 		Msg("inject: processing")
 
@@ -138,6 +140,7 @@ func (s *Server) Inject(c *fiber.Ctx) error {
 		ProfileID:   req.ProfileID,
 		CustomData:  req.CustomData,
 		Stealth:     engine.StealthLevel(req.Stealth),
+		Fast:        req.Fast,
 		AddCanary:   req.AddCanary,
 		CanaryLabel: req.CanaryLabel,
 		CanaryURL:   req.CanaryURL,

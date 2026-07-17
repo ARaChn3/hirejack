@@ -11,13 +11,26 @@ import (
 // The stream will exist in the xref table but won't be reachable from
 // the document tree — invisible to viewers but extractable by parsers.
 func (p *PDF) CreateOrphanStream(content []byte) error {
+	return p.createOrphanStream(content, true)
+}
+
+// CreateOrphanStreamRaw creates an uncompressed orphan stream (faster).
+func (p *PDF) CreateOrphanStreamRaw(content []byte) error {
+	return p.createOrphanStream(content, false)
+}
+
+func (p *PDF) createOrphanStream(content []byte, compress bool) error {
 	sd := types.StreamDict{
 		Dict:    types.Dict{},
 		Content: content,
 	}
-	if err := sd.Encode(); err != nil {
-		return fmt.Errorf("pdf: orphan: encode: %w", err)
+	if compress {
+		if err := sd.Encode(); err != nil {
+			return fmt.Errorf("pdf: orphan: encode: %w", err)
+		}
 	}
+	// Raw stream: just set length, no filter
+	sd.Dict["Length"] = types.Integer(len(content))
 
 	_, err := p.ctx.XRefTable.IndRefForNewObject(sd)
 	if err != nil {

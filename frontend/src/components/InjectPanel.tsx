@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CATEGORY_META, DEFAULT_CATEGORY_META } from "@/lib/payloads";
 import type { FileMeta, Status } from "@/types";
@@ -48,6 +49,8 @@ export function InjectPanel({
   error,
   stealth,
   onStealthChange,
+  fast,
+  onFastChange,
   canaryUrl,
   onCanaryUrlChange,
   onRemove,
@@ -60,6 +63,8 @@ export function InjectPanel({
   error: string | null;
   stealth: number;
   onStealthChange: (level: number) => void;
+  fast: boolean;
+  onFastChange: (fast: boolean) => void;
   canaryUrl: string;
   onCanaryUrlChange: (url: string) => void;
   onRemove: (key: string) => void;
@@ -142,9 +147,15 @@ export function InjectPanel({
             </button>
           ))}
         </div>
-        <p className="font-mono text-xs text-text-faint">
-          {STEALTH_LEVELS.find((s) => s.level === stealth)?.desc}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs text-text-faint">
+            {STEALTH_LEVELS.find((s) => s.level === stealth)?.desc}
+          </p>
+          <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
+            <Switch checked={fast} onCheckedChange={onFastChange} disabled={status === "injecting"} />
+            fast mode
+          </label>
+        </div>
       </div>
 
       {/* Callback URL for remote auditing */}

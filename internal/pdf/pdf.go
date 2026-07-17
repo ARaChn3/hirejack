@@ -28,6 +28,10 @@ func Parse(data []byte) (*PDF, error) {
 
 	conf := model.NewDefaultConfiguration()
 	conf.ValidationMode = model.ValidationRelaxed
+	// Disable optimization to preserve orphan streams
+	conf.Optimize = false
+	conf.OptimizeBeforeWriting = false
+	conf.OptimizeResourceDicts = false
 
 	ctx, err := api.ReadContext(bytes.NewReader(data), conf)
 	if err != nil {
@@ -46,6 +50,17 @@ func (p *PDF) Bytes() ([]byte, error) {
 	var buf bytes.Buffer
 	if err := api.Write(p.ctx, &buf, p.ctx.Configuration); err != nil {
 		return nil, fmt.Errorf("pdf: write: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// BytesIncremental returns the PDF with changes appended incrementally.
+// This preserves orphan objects that would be removed by a full rewrite.
+func (p *PDF) BytesIncremental() ([]byte, error) {
+	// Start with original bytes
+	buf := bytes.NewBuffer(p.raw)
+	if err := api.WriteIncrement(p.ctx, buf); err != nil {
+		return nil, fmt.Errorf("pdf: write increment: %w", err)
 	}
 	return buf.Bytes(), nil
 }

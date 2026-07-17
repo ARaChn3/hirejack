@@ -70,6 +70,7 @@ type InjectRequest struct {
 	ProfileID   string            `json:"profile_id"`   // Or use a profile
 	CustomData  map[string]string `json:"custom_data"`  // Custom fields
 	Stealth     StealthLevel      `json:"stealth"`      // Override stealth
+	Fast        bool              `json:"fast"`         // Skip compression for speed
 	AddCanary   bool              `json:"add_canary"`   // Add canary token
 	CanaryLabel string            `json:"canary_label"` // Label for canary
 	CanaryURL   string            `json:"canary_url"`   // Custom callback URL (overrides default)
@@ -124,17 +125,17 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 	// Inject based on stealth level
 	switch {
 	case stealth >= StealthMax:
-		log.Debug().Msg("engine: using injectMax (L5)")
-		e.injectMax(doc, payloadList, result)
+		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectMax (L5)")
+		e.injectMax(doc, payloadList, result, req.Fast)
 	case stealth >= StealthOrphan:
-		log.Debug().Msg("engine: using injectOrphan (L4)")
-		e.injectOrphan(doc, payloadList, result)
+		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectOrphan (L4)")
+		e.injectOrphan(doc, payloadList, result, req.Fast)
 	case stealth >= StealthSplit:
 		log.Debug().Msg("engine: using injectSplit (L3)")
 		e.injectSplit(doc, payloadList, result)
 	case stealth >= StealthHex:
-		log.Debug().Msg("engine: using injectHex (L2)")
-		e.injectHex(doc, payloadList, result)
+		log.Debug().Bool("fast", req.Fast).Msg("engine: using injectHex (L2)")
+		e.injectHex(doc, payloadList, result, req.Fast)
 	default:
 		log.Debug().Msg("engine: using injectBasic (L1)")
 		e.injectBasic(doc, payloadList, result)
@@ -172,7 +173,13 @@ func (e *Engine) Inject(req InjectRequest) (*InjectResult, error) {
 		}
 	}
 
-	result.PDF, err = doc.Bytes()
+	// Use incremental write for orphan modes to preserve unreferenced objects
+	if stealth >= StealthOrphan {
+		result.PDF, err = doc.BytesIncremental()
+		log.Debug().Msg("engine: using incremental write for orphan preservation")
+	} else {
+		result.PDF, err = doc.Bytes()
+	}
 	if err != nil {
 		log.Debug().Err(err).Msg("engine: pdf write failed")
 		return nil, fmt.Errorf("engine: write: %w", err)
@@ -311,7 +318,7 @@ func (e *Engine) injectBasic(doc *pdf.PDF, plist []payloads.Payload, result *Inj
 	}
 }
 
-func (e *Engine) injectHex(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
+func (e *Engine) injectHex(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult, fast bool) {
 	fields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
 
 	for i, p := range plist {
@@ -320,7 +327,11 @@ func (e *Engine) injectHex(doc *pdf.PDF, plist []payloads.Payload, result *Injec
 		}
 		encoded := e.hexEncoder.Encode(p.Template)
 		if i >= len(fields) {
-			doc.CreateOrphanStream([]byte(encoded))
+			if fast {
+				doc.CreateOrphanStreamRaw([]byte(encoded))
+			} else {
+				doc.CreateOrphanStream([]byte(encoded))
+			}
 			result.Injections = append(result.Injections, InjectionPoint{
 				Location: "orphan",
 				Payload:  p.Template,
@@ -372,12 +383,16 @@ func (e *Engine) injectSplit(doc *pdf.PDF, plist []payloads.Payload, result *Inj
 	}
 }
 
-func (e *Engine) injectOrphan(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
+func (e *Engine) injectOrphan(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult, fast bool) {
 	for _, p := range plist {
 		if p.Template == "" {
 			continue
 		}
-		doc.CreateOrphanStream([]byte(p.Template))
+		if fast {
+			doc.CreateOrphanStreamRaw([]byte(p.Template))
+		} else {
+			doc.CreateOrphanStream([]byte(p.Template))
+		}
 		result.Injections = append(result.Injections, InjectionPoint{
 			Location: "orphan",
 			Payload:  p.Template,
@@ -385,7 +400,7 @@ func (e *Engine) injectOrphan(doc *pdf.PDF, plist []payloads.Payload, result *In
 	}
 }
 
-func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult) {
+func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *InjectResult, fast bool) {
 	// Max stealth: distribute payloads across techniques
 	// Bucket by location type, then inject combined
 	metaFields := []string{"Author", "Subject", "Keywords", "Creator", "Producer"}
@@ -457,7 +472,11 @@ func (e *Engine) injectMax(doc *pdf.PDF, plist []payloads.Payload, result *Injec
 
 	// Inject orphan streams (one per payload for max coverage)
 	for _, p := range orphanPayloads {
-		doc.CreateOrphanStream([]byte(p))
+		if fast {
+			doc.CreateOrphanStreamRaw([]byte(p))
+		} else {
+			doc.CreateOrphanStream([]byte(p))
+		}
 		result.Injections = append(result.Injections, InjectionPoint{
 			Location: "orphan", Payload: p,
 		})

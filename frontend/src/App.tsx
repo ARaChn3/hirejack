@@ -35,6 +35,7 @@ async function runInject(
   selected: Set<string>,
   dispatch: React.Dispatch<Parameters<typeof reducer>[1]>,
   stealthLevel: number,
+  fastMode: boolean,
   canaryUrl?: string,
 ) {
   dispatch({ type: "START_INJECT" });
@@ -58,6 +59,7 @@ async function runInject(
         pdf: pdfBase64,
         payload_ids: payloadIds,
         stealth: stealthLevel,
+        fast: fastMode,
         add_canary: true,
         canary_label: file.file.name,
         canary_url: canaryUrl || undefined,
@@ -102,6 +104,7 @@ function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [canaryUrl, setCanaryUrl] = useState("");
   const [stealth, setStealth] = useState(5);
+  const [fast, setFast] = useState(true);
   const toolRef = useRef<HTMLDivElement>(null);
 
   function scrollToTool() {
@@ -179,11 +182,13 @@ function App() {
             error={state.error}
             stealth={stealth}
             onStealthChange={setStealth}
+            fast={fast}
+            onFastChange={setFast}
             canaryUrl={canaryUrl}
             onCanaryUrlChange={setCanaryUrl}
             onRemove={(key) => dispatch({ type: "TOGGLE_PAYLOAD", key })}
             onInject={() => {
-              if (state.file) void runInject(state.file, state.selected, dispatch, stealth, canaryUrl);
+              if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, canaryUrl);
             }}
           />
         </Stage>
@@ -209,7 +214,7 @@ function App() {
               size="sm"
               disabled={!stage03Unlocked || state.status === "injecting"}
               onClick={() => {
-                if (state.file) void runInject(state.file, state.selected, dispatch, stealth, canaryUrl);
+                if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, canaryUrl);
               }}
               className="rounded-sm font-mono tracking-wide"
             >
