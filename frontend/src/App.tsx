@@ -36,6 +36,7 @@ async function runInject(
   dispatch: React.Dispatch<Parameters<typeof reducer>[1]>,
   stealthLevel: number,
   fastMode: boolean,
+  noiseMode: boolean,
   canaryUrl?: string,
 ) {
   dispatch({ type: "START_INJECT" });
@@ -60,6 +61,7 @@ async function runInject(
         payload_ids: payloadIds,
         stealth: stealthLevel,
         fast: fastMode,
+        noise: noiseMode,
         add_canary: true,
         canary_label: file.file.name,
         canary_url: canaryUrl || undefined,
@@ -67,8 +69,15 @@ async function runInject(
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || `HTTP ${res.status}`);
+      // ponytail: server may return plain text errors (413 etc), not JSON
+      const text = await res.text();
+      let msg: string;
+      try {
+        msg = JSON.parse(text).error || `HTTP ${res.status}`;
+      } catch {
+        msg = text || `HTTP ${res.status}`;
+      }
+      throw new Error(msg);
     }
 
     const data = await res.json();
@@ -105,6 +114,7 @@ function App() {
   const [canaryUrl, setCanaryUrl] = useState("");
   const [stealth, setStealth] = useState(5);
   const [fast, setFast] = useState(true);
+  const [noise, setNoise] = useState(false);
   const toolRef = useRef<HTMLDivElement>(null);
 
   function scrollToTool() {
@@ -184,11 +194,13 @@ function App() {
             onStealthChange={setStealth}
             fast={fast}
             onFastChange={setFast}
+            noise={noise}
+            onNoiseChange={setNoise}
             canaryUrl={canaryUrl}
             onCanaryUrlChange={setCanaryUrl}
             onRemove={(key) => dispatch({ type: "TOGGLE_PAYLOAD", key })}
             onInject={() => {
-              if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, canaryUrl);
+              if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, noise, canaryUrl);
             }}
           />
         </Stage>
@@ -214,7 +226,7 @@ function App() {
               size="sm"
               disabled={!stage03Unlocked || state.status === "injecting"}
               onClick={() => {
-                if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, canaryUrl);
+                if (state.file) void runInject(state.file, state.selected, dispatch, stealth, fast, noise, canaryUrl);
               }}
               className="rounded-sm font-mono tracking-wide"
             >

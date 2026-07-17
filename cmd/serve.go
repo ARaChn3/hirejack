@@ -41,6 +41,7 @@ func runServer() {
 	app := fiber.New(fiber.Config{
 		AppName:               "hirejack",
 		DisableStartupMessage: true,
+		BodyLimit:             50 * 1024 * 1024, // ponytail: 50MB for large PDFs
 	})
 
 	app.Use(func(c *fiber.Ctx) error {

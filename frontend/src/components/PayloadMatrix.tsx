@@ -1,18 +1,10 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, Search, Zap, Eye, EyeOff } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, Zap, Eye, EyeOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CATEGORY_META, DEFAULT_CATEGORY_META, payloadKey } from "@/lib/payloads";
 import type { Category, Payload } from "@/types";
-
-const LANE_BORDER: Record<string, string> = {
-  danger: "border-l-danger",
-  warn: "border-l-warn",
-  info: "border-l-info",
-  accent: "border-l-accent",
-};
 
 const LANE_TEXT: Record<string, string> = {
   danger: "text-danger",
@@ -102,18 +94,16 @@ function PayloadToggle({
   );
 }
 
-function CategoryCard({
+function PayloadList({
   category,
   selected,
   onToggle,
-  onSetAll,
   compact,
   searchFilter,
 }: {
   category: Category;
   selected: Set<string>;
   onToggle: (key: string) => void;
-  onSetAll: (keys: string[], on: boolean) => void;
   compact: boolean;
   searchFilter: string;
 }) {
@@ -127,59 +117,31 @@ function CategoryCard({
     );
   }, [category.payloads, searchFilter]);
 
-  if (filteredPayloads.length === 0) return null;
-
-  const allKeys = category.payloads.map((p) => payloadKey(category.id, p.id));
-  const armedCount = allKeys.filter((k) => selected.has(k)).length;
-  const allArmed = armedCount === category.payloads.length && category.payloads.length > 0;
+  if (filteredPayloads.length === 0) {
+    return (
+      <div className="px-3 py-8 text-center font-mono text-sm text-text-faint">
+        no payloads match filter
+      </div>
+    );
+  }
 
   return (
-    <Collapsible
-      defaultOpen={false}
-      className={cn(
-        "rounded-sm border border-l-2 border-border bg-panel",
-        LANE_BORDER[meta.color],
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className={cn("text-sm font-semibold", LANE_TEXT[meta.color])}>{category.name}</span>
-          <Badge variant="outline" className={cn("rounded-sm px-1.5 py-0 font-mono text-xs", LANE_BG[meta.color])}>
-            {armedCount}/{category.payloads.length}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
-            all
-            <Switch
-              checked={allArmed}
-              onCheckedChange={(on) => onSetAll(allKeys, Boolean(on))}
-            />
-          </label>
-          <CollapsibleTrigger className="flex size-5 items-center justify-center text-text-dim [&[data-state=open]>svg]:rotate-180">
-            <ChevronDown className="size-3.5 transition-transform" />
-          </CollapsibleTrigger>
-        </div>
-      </div>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-px border-t border-border px-1.5 py-1.5">
-          {filteredPayloads.map((payload) => {
-            const key = payloadKey(category.id, payload.id);
-            return (
-              <PayloadToggle
-                key={key}
-                categoryId={category.id}
-                payload={payload}
-                lane={meta.color}
-                checked={selected.has(key)}
-                onToggle={() => onToggle(key)}
-                compact={compact}
-              />
-            );
-          })}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="flex flex-col gap-px px-1.5 py-1.5">
+      {filteredPayloads.map((payload) => {
+        const key = payloadKey(category.id, payload.id);
+        return (
+          <PayloadToggle
+            key={key}
+            categoryId={category.id}
+            payload={payload}
+            lane={meta.color}
+            checked={selected.has(key)}
+            onToggle={() => onToggle(key)}
+            compact={compact}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -206,11 +168,25 @@ export function PayloadMatrix({
 }) {
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+
+  // Set first category as active when loaded
+  const currentTab = activeTab ?? categories[0]?.id ?? null;
+  const activeCategory = categories.find((c) => c.id === currentTab);
 
   const stats = useMemo(() => {
     const total = categories.reduce((acc, c) => acc + c.payloads.length, 0);
     const armed = selected.size;
     return { total, armed };
+  }, [categories, selected]);
+
+  const categoryStats = useMemo(() => {
+    const map: Record<string, { armed: number; total: number }> = {};
+    for (const cat of categories) {
+      const keys = cat.payloads.map((p) => payloadKey(cat.id, p.id));
+      map[cat.id] = { armed: keys.filter((k) => selected.has(k)).length, total: cat.payloads.length };
+    }
+    return map;
   }, [categories, selected]);
 
   if (categoriesError) {
@@ -232,6 +208,9 @@ export function PayloadMatrix({
   const allKeys = categories.flatMap((cat) =>
     cat.payloads.map((p) => payloadKey(cat.id, p.id))
   );
+
+  const currentCatKeys = activeCategory?.payloads.map((p) => payloadKey(activeCategory.id, p.id)) ?? [];
+  const currentAllArmed = currentCatKeys.length > 0 && currentCatKeys.every((k) => selected.has(k));
 
   const applyProfile = (profileId: string) => {
     onSetAll(allKeys, false);
@@ -305,20 +284,63 @@ export function PayloadMatrix({
         </button>
       </div>
 
-      {/* Categories grid */}
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-        {categories.map((category) => (
-          <CategoryCard
-            key={category.id}
-            category={category}
-            selected={selected}
-            onToggle={onToggle}
-            onSetAll={onSetAll}
-            compact={compact}
-            searchFilter={search}
-          />
-        ))}
+      {/* Category tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {categories.map((cat) => {
+          const meta = CATEGORY_META[cat.id] ?? DEFAULT_CATEGORY_META;
+          const stat = categoryStats[cat.id];
+          const isActive = cat.id === currentTab;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveTab(cat.id)}
+              className={cn(
+                "relative px-3 py-2 font-mono text-sm transition-colors",
+                isActive
+                  ? cn("text-text", LANE_TEXT[meta.color])
+                  : "text-text-dim hover:text-text"
+              )}
+            >
+              {cat.name}
+              {stat && stat.armed > 0 && (
+                <span className={cn("ml-1.5 text-xs", LANE_TEXT[meta.color])}>
+                  {stat.armed}
+                </span>
+              )}
+              {isActive && (
+                <span className={cn("absolute inset-x-0 -bottom-px h-0.5", `bg-${meta.color}`, LANE_BG[meta.color])} />
+              )}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Active category content */}
+      {activeCategory && (
+        <div className="rounded-sm border border-border bg-panel">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="font-mono text-xs text-text-dim">
+              {categoryStats[activeCategory.id]?.armed ?? 0}/{activeCategory.payloads.length} armed
+            </span>
+            <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
+              all
+              <Switch
+                checked={currentAllArmed}
+                onCheckedChange={(on) => onSetAll(currentCatKeys, Boolean(on))}
+              />
+            </label>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto">
+            <PayloadList
+              category={activeCategory}
+              selected={selected}
+              onToggle={onToggle}
+              compact={compact}
+              searchFilter={search}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -50,6 +50,8 @@ export function InjectPanel({
   onStealthChange,
   fast,
   onFastChange,
+  noise,
+  onNoiseChange,
   canaryUrl,
   onCanaryUrlChange,
   onRemove,
@@ -64,6 +66,8 @@ export function InjectPanel({
   onStealthChange: (level: number) => void;
   fast: boolean;
   onFastChange: (fast: boolean) => void;
+  noise: boolean;
+  onNoiseChange: (noise: boolean) => void;
   canaryUrl: string;
   onCanaryUrlChange: (url: string) => void;
   onRemove: (key: string) => void;
@@ -150,10 +154,16 @@ export function InjectPanel({
           <p className="font-mono text-xs text-text-faint">
             {STEALTH_LEVELS.find((s) => s.level === stealth)?.desc}
           </p>
-          <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
-            <Switch checked={fast} onCheckedChange={onFastChange} disabled={status === "injecting"} />
-            fast mode
-          </label>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
+              <Switch checked={noise} onCheckedChange={onNoiseChange} disabled={status === "injecting"} />
+              noise
+            </label>
+            <label className="flex items-center gap-1.5 font-mono text-xs text-text-faint">
+              <Switch checked={fast} onCheckedChange={onFastChange} disabled={status === "injecting"} />
+              fast
+            </label>
+          </div>
         </div>
       </div>
 

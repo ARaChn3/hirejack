@@ -101,6 +101,7 @@ type InjectRequest struct {
 	AddCanary   bool              `json:"add_canary"`
 	CanaryLabel string            `json:"canary_label"`
 	CanaryURL   string            `json:"canary_url"`   // Custom callback URL (for remote auditing)
+	Noise       bool              `json:"noise"`        // Add LLM-targeted decoy noise
 }
 
 // InjectResponse is the API response for injection.
@@ -144,6 +145,7 @@ func (s *Server) Inject(c *fiber.Ctx) error {
 		AddCanary:   req.AddCanary,
 		CanaryLabel: req.CanaryLabel,
 		CanaryURL:   req.CanaryURL,
+		Noise:       req.Noise,
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("inject: engine failed")

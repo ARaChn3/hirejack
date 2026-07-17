@@ -21,7 +21,7 @@ const banner = `
 var (
 	port     string
 	headless bool
-	verbose  bool
+	quiet    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -34,9 +34,9 @@ and ML poisoning attacks.
 It provides a web interface for uploading PDF resumes, selecting payloads,
 and generating weaponized documents to test ATS parser vulnerabilities.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		if verbose {
-			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		if quiet {
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
@@ -49,7 +49,7 @@ and generating weaponized documents to test ATS parser vulnerabilities.`,
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose debug output")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress debug output")
 	rootCmd.Flags().StringVarP(&port, "port", "p", "8080", "server port")
 	rootCmd.Flags().BoolVar(&headless, "headless", false, "don't open browser")
 
